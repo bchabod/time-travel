@@ -13,14 +13,14 @@ import Control.Monad.State
 import Control.Monad.Writer
 
 data Val = I Int | B Bool
-    deriving (Eq, Show)
+    deriving (Eq, Show, Read)
 
 data Expr = Const Val
     | Add Expr Expr | Sub Expr Expr  | Mul Expr Expr | Div Expr Expr
     | And Expr Expr | Or Expr Expr | Not Expr
     | Eq Expr Expr | Gt Expr Expr | Lt Expr Expr
     | Var String
-    deriving (Eq, Show)
+    deriving (Eq, Show, Read)
 
 data Statement = Assign String Expr
     | If Expr Statement Statement
@@ -29,7 +29,7 @@ data Statement = Assign String Expr
     | Seq Statement Statement
     | Try Statement Statement
     | Pass
-    deriving (Eq, Show)
+    deriving (Eq, Show, Read)
 
 type Name = String
 type Env = Map.Map Name Val
@@ -189,6 +189,10 @@ prog10 = do
      )
     print $ var "total"
 
+stringToProgram :: String -> Program
+stringToProgram src = (read :: String -> Program) src
+
 main :: IO ()
 main = do
-    run prog10
+    file <- readFile "factorial.txt"
+    run (stringToProgram file)
