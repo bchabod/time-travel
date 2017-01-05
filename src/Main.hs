@@ -123,9 +123,14 @@ exec (Step (Seq s0 s1)) = exec (Seq s0 s1)
 exec (Step s) = do
     askAction s
 
+showSt :: Statement -> String
+showSt s = show s
+showSt (If c _ _)  = "If " ++ (show c) ++ " {...}"
+showSt (While c _) = "While " ++ (show c) ++ " {...}"
+
 askAction :: Statement -> Run ()
 askAction s = do
-    liftIO $ putStrLn (show s ++ "\nEnter anything to execute this statement")
+    liftIO $ putStrLn (showSt s ++ "\nEnter anything to execute this statement")
     action <- liftIO getLine
     case action of
         _ -> exec s
