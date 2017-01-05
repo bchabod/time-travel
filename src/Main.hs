@@ -29,6 +29,7 @@ data Statement = Assign String Expr
     | Seq Statement Statement
     | Try Statement Statement
     | Pass
+    | Step Statement
     deriving (Eq, Show, Read)
 
 type Name = String
@@ -96,7 +97,7 @@ exec (Assign s v) = do
     Right val <- return $ runEval st (eval v)
     set (s,val)
 
-exec (Seq s0 s1) = do exec s0 >> exec s1
+exec (Seq s0 s1) = do exec (Step s0) >> exec (Step s1)
 
 exec (Print e) = do
     st <- get
@@ -116,6 +117,18 @@ exec (While cond s) = do
 
 exec (Try s0 s1) = do catchError (exec s0) (\e -> exec s1)
 exec Pass = return ()
+
+exec (Step (Seq s0 s1)) = exec (Seq s0 s1)
+
+exec (Step s) = do
+    askAction s
+
+askAction :: Statement -> Run ()
+askAction s = do
+    liftIO $ putStrLn (show s ++ "\nEnter anything to execute this statement")
+    action <- liftIO getLine
+    case action of
+        _ -> exec s
 
 type Program = Writer Statement ()
 
@@ -156,7 +169,7 @@ compile p = snd . runIdentity $ runWriterT p
 
 run :: Program -> IO ()
 run program = do
-    result <- runExceptT $ (runStateT $ exec $ snd $ runIdentity $ (runWriterT program)) Map.empty
+    result <- runExceptT $ runStateT (exec (compile program)) Map.empty
     case result of
         Right ( (), env ) -> return ()
         Left exn -> System.print ("Uncaught exception: "++exn)
