@@ -124,9 +124,9 @@ exec (Step s) = do
     askAction s
 
 showSt :: Statement -> String
-showSt s = show s
 showSt (If c _ _)  = "If " ++ (show c) ++ " {...}"
 showSt (While c _) = "While " ++ (show c) ++ " {...}"
+showSt s = show s
 
 askAction :: Statement -> Run ()
 askAction s = do
@@ -137,38 +137,6 @@ askAction s = do
 
 type Program = Writer Statement ()
 
-int = Const . I
-bool = Const . B
-var = Var
-
-class SmartAssignment a where
-    assign :: String -> a -> Statement
-
-instance SmartAssignment Int where
-    assign v i = Assign v (Const (I i))
-
-instance SmartAssignment Bool where
-    assign v b = Assign v (Const (B b))
-
-instance SmartAssignment Expr where
-    assign v e = Assign v e
-
-class PrettyExpr a b where
-    (.*) :: a -> b -> Expr
-    (.-) :: a -> b -> Expr
-
-instance PrettyExpr String String where
-    x .* y = (Var x) `Mul` (Var y)
-    x .- y = (Var x) `Sub` (Var y)
-
-instance PrettyExpr String Int where
-    x .* y = (Var x) `Mul` (Const (I y))
-    x .- y = (Var x) `Sub` (Const (I y))
-
-instance Monoid Statement where
-    mempty = Pass
-    mappend a b = a `Seq` b
-
 compile :: Program -> Statement
 compile p = snd . runIdentity $ runWriterT p
 
@@ -178,34 +146,6 @@ run program = do
     case result of
         Right ( (), env ) -> return ()
         Left exn -> System.print ("Uncaught exception: "++exn)
-
-infixl 1 .=
-(.=) :: String -> Expr -> Program
-var .= val = tell $ assign var val
-
-iif :: Expr -> Program -> Program -> Program
-iif cond tthen eelse = tell $ If cond (compile tthen) (compile eelse)
-
-while :: Expr -> Program -> Program
-while cond body = tell $ While cond (compile body)
-
-print :: Expr -> Program
-print e = tell $ Print e
-
-try :: Program -> Program -> Program
-try block recover = tell $ Try (compile block) (compile recover)
-
-prog10 :: Program
-prog10 = do
-    "arg"     .= int 10
-    "scratch" .= var "arg"
-    "total"   .= int 1
-    while ( (var "scratch") `Gt` (int 1) ) (
-     do "total"   .=  "total" .* "scratch"
-        "scratch" .= "scratch" .- (1::Int)
-        print $ var "scratch"
-     )
-    print $ var "total"
 
 stringToProgram :: String -> Program
 stringToProgram src = (read :: String -> Program) src
