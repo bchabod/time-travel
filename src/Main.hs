@@ -128,12 +128,23 @@ showSt (If c _ _)  = "If " ++ (show c) ++ " {...}"
 showSt (While c _) = "While " ++ (show c) ++ " {...}"
 showSt s = show s
 
+showVariables :: Run ()
+showVariables = do
+    st <- get
+    liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" st
+
 askAction :: Statement -> Run ()
 askAction s = do
-    liftIO $ putStrLn (showSt s ++ "\nEnter anything to execute this statement")
+    liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec | inspect]")
     action <- liftIO getLine
     case action of
-        _ -> exec s
+        "exec" -> exec s
+        "inspect" -> do
+            showVariables
+            askAction s
+        _ -> do
+            liftIO $ putStrLn ("Unknown command.")
+            askAction s
 
 type Program = Writer Statement ()
 
