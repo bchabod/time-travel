@@ -143,22 +143,37 @@ showVariables = do
         liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
         liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
 
-recordState :: Run ()
-recordState = do
+recordState :: Statement -> Run ()
+recordState s = do
     st <- get
-    put $ MetaState {environments = (getEnv st):(environments st), statements = (statements st)}
+    put $ MetaState {environments = (getEnv st):(environments st), statements = s:(statements st)}
+
+rewindAction :: Statement -> Run ()
+rewindAction s = do
+    st <- get
+    case (length $ statements st) of
+        0 -> do
+            liftIO $ putStrLn $ "Error: no previous statements."
+            exec (Step s)
+        _ -> do
+            let previous = head $ statements st
+            put $ MetaState {environments = (tail $ environments st), statements = (tail $ statements st)}
+            exec (Step previous)
 
 askAction :: Statement -> Run ()
 askAction s = do
-    liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec | inspect]")
+    liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec e | inspect i | rewind r]")
     action <- liftIO getLine
     case action of
-        "exec" -> do
-            recordState
+        "e" -> do
+            recordState s
             exec s
-        "inspect" -> do
+        "i" -> do
             showVariables
             askAction s
+        "r" -> do
+            rewindAction s
+            exec (Step s)
         _ -> do
             liftIO $ putStrLn ("Unknown command.")
             askAction s
