@@ -33,7 +33,13 @@ data Statement = Assign String Expr
     deriving (Eq, Show, Read)
 
 type Name = String
+
 type Env = Map.Map Name Val
+data MetaState = MetaState {environments :: [Env], statements :: [Statement]}
+
+getEnv :: MetaState -> Env
+getEnv ms = (if l == 0 then Map.empty else (head $ environments ms))
+    where l = length (environments ms)
 
 type Eval a = ReaderT Env (ExceptT String Identity) a
 
@@ -84,35 +90,37 @@ eval (Lt e0 e1) = do evalib (<) e0 e1
 eval (Var s) = do env <- ask
                   lookup s env
 
-type Run a = StateT Env (ExceptT String IO) a
-runRun p =  runExceptT ( runStateT p Map.empty)
+type Run a = StateT MetaState (ExceptT String IO) a
+runRun p =  runExceptT ( runStateT p (MetaState {environments = [], statements = []}))
 
 set :: (Name, Val) -> Run ()
-set (s,i) = state $ (\table -> ((), Map.insert s i table))
+set (s,i) = state $ (\table ->
+    let newEnv = Map.insert s i $ getEnv table
+    in ((), MetaState {environments = newEnv : (tail $ environments table), statements = (statements table)} ))
 
 exec :: Statement -> Run ()
 
 exec (Assign s v) = do
     st <- get
-    Right val <- return $ runEval st (eval v)
+    Right val <- return $ runEval (getEnv st) (eval v)
     set (s,val)
 
 exec (Seq s0 s1) = do exec (Step s0) >> exec (Step s1)
 
 exec (Print e) = do
     st <- get
-    Right val <- return $ runEval st (eval e)
+    Right val <- return $ runEval (getEnv st) (eval e)
     liftIO $ System.print val
     return ()
 
 exec (If cond s0 s1) = do
     st <- get
-    Right (B val) <- return $ runEval st (eval cond)
+    Right (B val) <- return $ runEval (getEnv st) (eval cond)
     if val then do exec s0 else do exec s1
 
 exec (While cond s) = do
     st <- get
-    Right (B val) <- return $ runEval st (eval cond)
+    Right (B val) <- return $ runEval (getEnv st) (eval cond)
     if val then do exec s >> exec (While cond s) else return ()
 
 exec (Try s0 s1) = do catchError (exec s0) (\e -> exec s1)
@@ -131,14 +139,23 @@ showSt s = show s
 showVariables :: Run ()
 showVariables = do
     st <- get
-    liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" st
+    forM_ (zip [0..] (reverse $ environments st)) $ \(i, e) -> do
+        liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
+        liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
+
+recordState :: Run ()
+recordState = do
+    st <- get
+    put $ MetaState {environments = (getEnv st):(environments st), statements = (statements st)}
 
 askAction :: Statement -> Run ()
 askAction s = do
     liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec | inspect]")
     action <- liftIO getLine
     case action of
-        "exec" -> exec s
+        "exec" -> do
+            recordState
+            exec s
         "inspect" -> do
             showVariables
             askAction s
@@ -153,7 +170,7 @@ compile p = snd . runIdentity $ runWriterT p
 
 run :: Program -> IO ()
 run program = do
-    result <- runExceptT $ runStateT (exec (compile program)) Map.empty
+    result <- runExceptT $ runStateT (exec (compile program)) (MetaState {environments = [], statements = []})
     case result of
         Right ( (), env ) -> return ()
         Left exn -> System.print ("Uncaught exception: "++exn)
