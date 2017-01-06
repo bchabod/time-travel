@@ -166,7 +166,9 @@ rewindAction s = do
         _ -> do
             let previous = head $ statements st
             put $ MetaState {environments = (tail $ environments st), statements = (tail $ statements st)}
+            -- We need the execute (ask for an action on) the previous statement, and then we will go back to the current statement
             exec (Step previous)
+            exec (Step s)
 
 -- Asks the user for an action regarding the current statement
 askAction :: Statement -> Run ()
@@ -182,7 +184,6 @@ askAction s = do
             askAction s
         "r" -> do
             rewindAction s
-            exec (Step s)
         _ -> do
             liftIO $ putStrLn ("Unknown command.")
             askAction s
