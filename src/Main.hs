@@ -37,6 +37,7 @@ type Name = String
 type Env = Map.Map Name Val
 data MetaState = MetaState {environments :: [Env], statements :: [Statement]}
 
+-- Returns latest environment (variable dictionary)
 getEnv :: MetaState -> Env
 getEnv ms = (if l == 0 then Map.empty else (head $ environments ms))
     where l = length (environments ms)
@@ -131,11 +132,13 @@ exec (Step (Seq s0 s1)) = exec (Seq s0 s1)
 exec (Step s) = do
     askAction s
 
+-- Properly print a statement
 showSt :: Statement -> String
 showSt (If c _ _)  = "If " ++ (show c) ++ " {...}"
 showSt (While c _) = "While " ++ (show c) ++ " {...}"
 showSt s = show s
 
+-- Displays the latest environments (and therefore variables history)
 showVariables :: Run ()
 showVariables = do
     st <- get
@@ -146,11 +149,13 @@ showVariables = do
                 liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
                 liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
 
+-- Records the current environment and the statement about to be executed
 recordState :: Statement -> Run ()
 recordState s = do
     st <- get
     put $ MetaState {environments = (getEnv st):(environments st), statements = s:(statements st)}
 
+-- Takes a step back in the execution
 rewindAction :: Statement -> Run ()
 rewindAction s = do
     st <- get
@@ -163,6 +168,7 @@ rewindAction s = do
             put $ MetaState {environments = (tail $ environments st), statements = (tail $ statements st)}
             exec (Step previous)
 
+-- Asks the user for an action regarding the current statement
 askAction :: Statement -> Run ()
 askAction s = do
     liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec e | inspect i | rewind r]")
