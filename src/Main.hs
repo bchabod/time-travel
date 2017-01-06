@@ -139,9 +139,12 @@ showSt s = show s
 showVariables :: Run ()
 showVariables = do
     st <- get
-    forM_ (zip [0..] (reverse $ environments st)) $ \(i, e) -> do
-        liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
-        liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
+    case (length $ environments st) of
+        0 -> liftIO $ putStrLn $ "No variables have been set."
+        _ -> do
+            forM_ (zip [0..] (reverse $ environments st)) $ \(i, e) -> do
+                liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
+                liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
 
 recordState :: Statement -> Run ()
 recordState s = do
