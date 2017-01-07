@@ -37,6 +37,15 @@ type Name = String
 type Env = Map.Map Name Val
 data MetaState = MetaState {environments :: [Env], statements :: [Statement]}
 
+-- Color magic strings
+colorRed = "\x1b[31m"
+colorGreen = "\x1b[32m"
+colorYellow = "\x1b[33m"
+colorBlue = "\x1b[34m"
+colorMagenta = "\x1b[35m"
+colorCyan = "\x1b[36m"
+colorReset = "\x1b[0m"
+
 -- Returns latest environment (variable dictionary)
 getEnv :: MetaState -> Env
 getEnv ms = (if l == 0 then Map.empty else (head $ environments ms))
@@ -138,16 +147,19 @@ showSt (If c _ _)  = "If " ++ (show c) ++ " {...}"
 showSt (While c _) = "While " ++ (show c) ++ " {...}"
 showSt s = show s
 
+putStrC :: String -> String -> IO ()
+putStrC c s = putStr $ c ++ s ++ colorReset
+
 -- Displays the latest environments (and therefore variables history)
 showVariables :: Run ()
 showVariables = do
     st <- get
     case (length $ environments st) of
-        0 -> liftIO $ putStrLn $ "No variables have been set."
+        0 -> liftIO $ putStrC colorRed "No variables have been set.\n"
         _ -> do
             forM_ (zip [0..] (reverse $ environments st)) $ \(i, e) -> do
-                liftIO $ putStrLn $ "--- State " ++ (show i) ++ " ---"
-                liftIO $ putStr $ Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e
+                liftIO $ putStrC colorGreen  ("--- State " ++ (show i) ++ " ---\n")
+                liftIO $ putStrC colorGreen ((Map.foldrWithKey (\k v r -> r ++ (show k) ++ ": " ++ (show v) ++ "\n") "" e) ++ "\n")
 
 -- Records the current environment and the statement about to be executed
 recordState :: Statement -> Run ()
@@ -161,7 +173,7 @@ rewindAction s = do
     st <- get
     case (length $ statements st) of
         0 -> do
-            liftIO $ putStrLn $ "Error: no previous statements."
+            liftIO $ putStrC colorRed "Error: no previous statements.\n"
             exec (Step s)
         _ -> do
             let previous = head $ statements st
@@ -173,7 +185,8 @@ rewindAction s = do
 -- Asks the user for an action regarding the current statement
 askAction :: Statement -> Run ()
 askAction s = do
-    liftIO $ putStrLn (showSt s ++ "\nWhat do you want to do? [exec e | inspect i | rewind r]")
+    liftIO $ putStrC colorBlue ("> " ++ showSt s ++ "\n")
+    liftIO $ putStr "What do you want to do? [exec e | inspect i | rewind r]\n"
     action <- liftIO getLine
     case action of
         "e" -> do
@@ -185,7 +198,7 @@ askAction s = do
         "r" -> do
             rewindAction s
         _ -> do
-            liftIO $ putStrLn ("Unknown command.")
+            liftIO $ putStrC colorRed ("Unknown command.\n")
             askAction s
 
 type Program = Writer Statement ()
