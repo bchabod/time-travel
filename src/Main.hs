@@ -5,6 +5,7 @@ module Main where
 import Prelude hiding (lookup, print)
 import qualified Data.Map as Map
 import Data.Maybe
+import Data.List
 import qualified System.IO as System
 import Control.Monad.Identity
 import Control.Monad.Except
@@ -98,7 +99,7 @@ eval (Gt e0 e1) = do evalib (>) e0 e1
 eval (Lt e0 e1) = do evalib (<) e0 e1
 
 eval (Var s) = do env <- ask
-                  lookup s env
+                  Main.lookup s env
 
 type Run a = StateT MetaState (ExceptT String IO) a
 runRun p =  runExceptT ( runStateT p (MetaState {environments = [], statements = []}))
@@ -216,7 +217,48 @@ run program = do
 stringToProgram :: String -> Program
 stringToProgram src = (read :: String -> Program) src
 
+-- Detect unused variables using two lists
+-- Used (in any Expr) and Init (in any Assign)
+
+detect :: Program -> [String]
+detect src = (nub $ analyzeInit (compile src)) \\ (nub $ analyzeUsed (compile src))
+
+analyzeUsed :: Statement -> [String]
+analyzeUsed (Step s) = analyzeUsed s
+analyzeUsed (Seq s0 s1) = analyzeUsed s0 ++ analyzeUsed s1
+analyzeUsed (Assign _ e) = used e
+analyzeUsed (Print e) = used e
+analyzeUsed (If c s0 s1) = used c ++ analyzeUsed s0 ++ analyzeUsed s1
+analyzeUsed (While c s) = used c ++ analyzeUsed s
+
+analyzeInit :: Statement -> [String]
+analyzeInit (Step s) = analyzeInit s
+analyzeInit (Seq s0 s1) = analyzeInit s0 ++ analyzeInit s1
+analyzeInit (Assign n _) = [n]
+analyzeInit (Print _) = []
+analyzeInit (If _ s0 s1) = analyzeInit s0 ++ analyzeInit s1
+analyzeInit (While _ s) = analyzeInit s
+
+used :: Expr -> [String]
+used (Add e0 e1) = used e0 ++ used e1
+used (Sub e0 e1) = used e0 ++ used e1
+used (Mul e0 e1) = used e0 ++ used e1
+used (Div e0 e1) = used e0 ++ used e1
+used (And e0 e1) = used e0 ++ used e1
+used (Or  e0 e1) = used e0 ++ used e1
+used (Eq  e0 e1) = used e0 ++ used e1
+used (Gt  e0 e1) = used e0 ++ used e1
+used (Lt  e0 e1) = used e0 ++ used e1
+used (Var name) = [name]
+used (Not e0) = used e0
+used (Const _) = []
+
 main :: IO ()
 main = do
     file <- readFile "factorial.txt"
+    putStrLn "Reading file factorial.txt..."
+    let analysis = detect $ stringToProgram file
+    if (length analysis == 0)
+    then putStrLn $ colorGreen ++ "The program is correct.\n"
+    else putStrLn $ colorRed ++ "Warning! Some variables have been initialized but not used: " ++ (show analysis)
     run (stringToProgram file)
