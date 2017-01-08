@@ -260,5 +260,5 @@ main = do
     let analysis = detect $ stringToProgram file
     if (length analysis == 0)
     then putStrLn $ colorGreen ++ "The program is correct.\n"
-    else putStrLn $ colorRed ++ "Warning! Some variables have been initialized but not used: " ++ (show analysis)
+    else putStrLn $ colorRed ++ "Warning! Some variables have been initialized but not used: " ++ (show analysis) ++ "\n"
     run (stringToProgram file)
